@@ -28,18 +28,16 @@ for i in $(seq 1 ${INSTANCES}); do
     echo "[INFO] (interactive) Starting ${NAME} and opening a host terminal with an interactive shell inside the container..."
 
     # Open a host terminal and run an interactive container shell (-it).
-    # You will get a bash prompt inside the container and can run/edit/check anything there.
-    # Note: use a different container name suffix for interactive mode to avoid name collisions.
     x-terminal-emulator -e bash -lc "\
-docker run --rm --privileged --ipc=host -it \
-  --name linuxcnc_instance_${i}_interactive \
-  -e DISPLAY=${DISPLAY:-:0} \
-  -e XDG_RUNTIME_DIR=${RUNTIME_DIR} \
-  -v /tmp/.X11-unix:/tmp/.X11-unix \
-  -v \"${HOST_CONFIG_DIR}\":/home/linuxcnc/configs \
-  -v \"${RUNTIME_DIR}\":\"${RUNTIME_DIR}\" \
-  ${IMAGE_NAME} \
-  bash" &
+	docker run --rm --privileged --ipc=host -it \
+	  --name linuxcnc_instance_${i}_interactive \
+	  -e DISPLAY=${DISPLAY:-:0} \
+	  -e XDG_RUNTIME_DIR=${RUNTIME_DIR} \
+	  -v /tmp/.X11-unix:/tmp/.X11-unix \
+	  -v \"${HOST_CONFIG_DIR}\":/home/linuxcnc/linuxcnc/configs \
+	  -v \"${RUNTIME_DIR}\":\"${RUNTIME_DIR}\" \
+	  ${IMAGE_NAME} \
+	  bash" &
 
   else
     # Non-interactive branch (unchanged)
@@ -50,10 +48,10 @@ docker run --rm --privileged --ipc=host -it \
       -e DISPLAY=${DISPLAY:-:0} \
       -e XDG_RUNTIME_DIR=${RUNTIME_DIR} \
       -v /tmp/.X11-unix:/tmp/.X11-unix \
-      -v "${HOST_CONFIG_DIR}":/home/linuxcnc/configs \
+      -v "${HOST_CONFIG_DIR}":/home/linuxcnc/linuxcnc/configs \
       -v "${RUNTIME_DIR}":"${RUNTIME_DIR}" \
       ${IMAGE_NAME} \
-      linuxcnc
+      linuxcnc linuxcnc/configs/axis_mm.ini
   fi
 done
 

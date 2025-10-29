@@ -74,9 +74,9 @@ RUN ./autogen.sh && \
 # =============================
 # Entrypoint
 # =============================
-COPY entrypoint.sh /home/entrypoint.sh
-RUN sudo chmod +x /home/entrypoint.sh
-ENTRYPOINT ["/home/entrypoint.sh"]
+COPY entrypoint.sh /home/linuxcnc/entrypoint.sh
+RUN sudo chmod +x /home/linuxcnc/entrypoint.sh
+ENTRYPOINT ["/home/linuxcnc/entrypoint.sh"]
 
-WORKDIR /home/
+WORKDIR /home/linuxcnc/
 
