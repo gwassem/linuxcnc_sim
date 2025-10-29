@@ -12,9 +12,9 @@ if ! docker images --format '{{.Repository}}' | grep -q "^${IMAGE_NAME}$"; then
 fi
 
 # Default values
-INSTANCES=3
-# "s" opens terminals (interactive shells inside container)
-TERMINALS="s"
+INSTANCES=1
+# "dev" opens terminals (interactive shells inside container)
+TERMINALS="dev"
 
 for i in $(seq 1 ${INSTANCES}); do
   NAME="cnc_${i}"
@@ -24,7 +24,7 @@ for i in $(seq 1 ${INSTANCES}); do
   mkdir -p "${HOST_CONFIG_DIR}"
   mkdir -p "${RUNTIME_DIR}"
 
-  if [ "${TERMINALS}" = "s" ]; then
+  if [ "${TERMINALS}" = "dev" ]; then
     echo "[INFO] (interactive) Starting ${NAME} and opening a host terminal with an interactive shell inside the container..."
 
     # Open a host terminal and run an interactive container shell (-it).
