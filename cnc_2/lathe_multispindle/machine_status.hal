@@ -1,0 +1,26 @@
+# machine_status.hal
+# Additional machine status logic
+
+# Load components for enhanced machine control
+loadrt toggle names=power_toggle,door_toggle,coolant_toggle,lube_toggle
+loadrt debounce names=estop_debounce,door_debounce
+
+addf power_toggle servo-thread
+addf door_toggle servo-thread
+addf coolant_toggle servo-thread
+addf lube_toggle servo-thread
+addf estop_debounce servo-thread
+addf door_debounce servo-thread
+
+# Connect toggle buttons
+net power-btn pyvcp.toggle-machine-power => power_toggle.in
+net door-btn pyvcp.toggle-door => door_toggle.in
+net coolant-btn pyvcp.toggle-coolant => coolant_toggle.in
+net lube-btn pyvcp.toggle-lube => lube_toggle.in
+
+net machine-power power_toggle.out => machine-on
+net door-state door_toggle.out => door-closed
+net coolant-state coolant_toggle.out => coolant-on
+net lube-state lube_toggle.out => lube-on
+
+# Add these to your main HAL file list in the INI file
