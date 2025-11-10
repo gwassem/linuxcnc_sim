@@ -11,13 +11,15 @@ if ! docker images --format '{{.Repository}}' | grep -q "^${IMAGE_NAME}$"; then
   docker build -t ${IMAGE_NAME} .
 fi
 
-# Default values
+# --- Set number of instances to 3 ---
 INSTANCES=1
 # "dev" opens terminals (interactive shells inside container)
 TERMINALS="dev"
+BASE_MACHINE_NAME="Lathe" # Must match the server's BASE_MACHINE_NAME
 
 for i in $(seq 1 ${INSTANCES}); do
   NAME="cnc_${i}"
+  MACHINE_ID="${BASE_MACHINE_NAME}_${i}" # e.g., "Lathe_1", "Lathe_2"
   HOST_CONFIG_DIR="$HOME/linuxcnc-configs/${NAME}"
   RUNTIME_DIR="/tmp/runtime-linuxcnc_${i}"
 
@@ -25,35 +27,39 @@ for i in $(seq 1 ${INSTANCES}); do
   mkdir -p "${RUNTIME_DIR}"
 
   if [ "${TERMINALS}" = "dev" ]; then
-    echo "[INFO] (interactive) Starting ${NAME} and opening a host terminal with an interactive shell inside the container..."
+    echo "[INFO] (interactive) Starting ${NAME} (ID: ${MACHINE_ID}) and opening a host terminal..."
 
     # Open a host terminal and run an interactive container shell (-it).
     x-terminal-emulator -e bash -lc "\
-	docker run --rm --privileged --ipc=host -it \
-	  --name linuxcnc_instance_${i}_interactive \
-	  -e DISPLAY=${DISPLAY:-:0} \
-	  -e XDG_RUNTIME_DIR=${RUNTIME_DIR} \
-	  -v /tmp/.X11-unix:/tmp/.X11-unix \
-	  -v \"${HOST_CONFIG_DIR}\":/home/linuxcnc/linuxcnc/configs \
-	  -v \"${RUNTIME_DIR}\":\"${RUNTIME_DIR}\" \
-	  ${IMAGE_NAME} \
-	  bash" &
-
-  else
-    # Non-interactive branch (unchanged)
-    echo "[INFO] Abrindo instância $i ($NAME) in detached mode..."
-    docker run -d --rm --privileged \
-      --ipc=host \
+    docker run --rm --privileged -it \
       --name linuxcnc_instance_${i} \
+      --add-host host.docker.internal:host-gateway \
       -e DISPLAY=${DISPLAY:-:0} \
       -e XDG_RUNTIME_DIR=${RUNTIME_DIR} \
+      -e MACHINE_ID=\"${MACHINE_ID}\" \
+      -v /tmp/.X11-unix:/tmp/.X11-unix \
+      -v \"${HOST_CONFIG_DIR}\":/home/linuxcnc/linuxcnc/configs \
+      -v \"${RUNTIME_DIR}\":\"${RUNTIME_DIR}\" \
+      ${IMAGE_NAME} \
+      linuxcnc /home/linuxcnc/linuxcnc/configs/gmoccapy/6_axis.ini
+      bash" &
+
+  else
+    # Non-interactive branch
+    echo "[INFO] Abrindo instância $i (${NAME}, ID: ${MACHINE_ID}) in detached mode..."
+    
+    docker run -d --rm --privileged \
+      --name linuxcnc_instance_${i} \
+      --add-host host.docker.internal:host-gateway \
+      -e DISPLAY=${DISPLAY:-:0} \
+      -e XDG_RUNTIME_DIR=${RUNTIME_DIR} \
+      -e MACHINE_ID=\"${MACHINE_ID}\" \
       -v /tmp/.X11-unix:/tmp/.X11-unix \
       -v "${HOST_CONFIG_DIR}":/home/linuxcnc/linuxcnc/configs \
       -v "${RUNTIME_DIR}":"${RUNTIME_DIR}" \
       ${IMAGE_NAME} \
-      linuxcnc linuxcnc/configs/axis_mm.ini
+      linuxcnc /home/linuxcnc/linuxcnc/configs/lathe.ini
   fi
 done
 
 echo "[INFO] All instances started. Use 'docker ps' to verify."
-

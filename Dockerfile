@@ -27,6 +27,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip3 install --no-cache-dir yapps2
 
 # =============================
+# OPC-UA Client Library
+# =============================
+RUN pip3 install --no-cache-dir asyncua pyzmq
+
+# =============================
 # Criar usuário linuxcnc
 # =============================
 # CHANGED: fixed user home, UID, and removed wrong /home/sidney
