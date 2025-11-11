@@ -1,0 +1,30 @@
+# lathe_postgui.hal - Enhanced with machine status connections
+
+# Spindle speed displays
+net spindle-rpm-filtered.0 => pyvcp.spindle.0.speed
+net spindle-at-speed.0 => pyvcp.spindle.0.at-speed
+net spindle-rpm-filtered.1 => pyvcp.spindle.1.speed
+net spindle-at-speed.1 => pyvcp.spindle.1.at-speed
+
+# Machine status displays
+net machine-on => pyvcp.machine-on
+net machine-ready => pyvcp.machine-ready
+net machine-enabled => pyvcp.machine-enabled
+net door-closed => pyvcp.door-closed
+net estop-triggered => pyvcp.estop-triggered
+net axis-x-homed => pyvcp.axis-x-homed
+net axis-z-homed => pyvcp.axis-z-homed
+
+# Control button connections
+net toggle-machine-power pyvcp.toggle-machine-power => machine-on
+net toggle-door pyvcp.toggle-door => door-closed
+net trigger-estop pyvcp.trigger-estop => estop-triggered
+net reset-estop pyvcp.reset-estop => estop-triggered-not
+net toggle-coolant pyvcp.toggle-coolant => coolant-on
+net toggle-lube pyvcp.toggle-lube => lube-on
+
+# E-stop reset logic
+loadrt not names=not_estop_reset
+addf not_estop_reset servo-thread
+net reset-estop-pyvcp pyvcp.reset-estop => not_estop_reset.in
+net reset-estop-not not_estop_reset.out => estop-triggered

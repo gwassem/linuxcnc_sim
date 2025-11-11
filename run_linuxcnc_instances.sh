@@ -20,7 +20,7 @@ BASE_MACHINE_NAME="Lathe" # Must match the server's BASE_MACHINE_NAME
 for i in $(seq 1 ${INSTANCES}); do
   NAME="cnc_${i}"
   MACHINE_ID="${BASE_MACHINE_NAME}_${i}" # e.g., "Lathe_1", "Lathe_2"
-  HOST_CONFIG_DIR="$HOME/linuxcnc-configs/${NAME}"
+  HOST_CONFIG_DIR="$HOME/linuxcnc_siml/inuxcnc-configs/${NAME}"
   RUNTIME_DIR="/tmp/runtime-linuxcnc_${i}"
 
   mkdir -p "${HOST_CONFIG_DIR}"
@@ -41,7 +41,7 @@ for i in $(seq 1 ${INSTANCES}); do
       -v \"${HOST_CONFIG_DIR}\":/home/linuxcnc/linuxcnc/configs \
       -v \"${RUNTIME_DIR}\":\"${RUNTIME_DIR}\" \
       ${IMAGE_NAME} \
-      linuxcnc /home/linuxcnc/linuxcnc/configs/gmoccapy/6_axis.ini
+      linuxcnc /home/linuxcnc/linuxcnc/configs/lathe.ini
       bash" &
 
   else
