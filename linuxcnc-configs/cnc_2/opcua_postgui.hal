@@ -1,0 +1,5 @@
+# File: opcua_postgui.hal
+# Connects standard HALUI pins to the OPC-UA component
+
+net machine-is-on     halui.machine.is-on        => opcua.machine-status
+net estop-is-active   halui.estop.is-activated   => opcua.emergency-stop

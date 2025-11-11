@@ -10,14 +10,13 @@ from asyncua import Client, ua
 OPC_UA_URL = "opc.tcp://host.docker.internal:4840/linuxcnc/"
 
 # --- Dynamic Node Configuration ---
-# Read the MACHINE_ID from the environment, defaulting to 'Lathe_1' if not set.
-# This ID is set by the 'run_linuxcnc_instances.sh' script.
 MACHINE_ID = os.environ.get("MACHINE_ID", "Lathe_2")
 NAMESPACE_INDEX = 2  # This is 'idx' from the server, typically 2
 
 # NodeIDs are now generated dynamically based on the MACHINE_ID
 NODE_ID_MACHINE_ON = f"ns={NAMESPACE_INDEX};s={MACHINE_ID}.Machine_On"
-NODE_ID_DOOR_CLOSED = f"ns={NAMESPACE_INDEX};s={MACHINE_ID}.Door_Closed"
+# FIXED: Changed from 'Emergency_Status' to 'Emergency_Stop' to match the server
+NODE_ID_EMERGENCY_STATUS = f"ns={NAMESPACE_INDEX};s={MACHINE_ID}.Emergency_Stop"
 # ---------------------------------
 
 # How often to read HAL and update the server (in seconds)
@@ -26,16 +25,19 @@ POLLING_RATE = 1.0
 async def main():
     # --- 1. Setup HAL Component ---
     try:
-        c = hal.component("hal-opcua-client")
+        # FIXED: Changed component name to 'opcua' to match the .hal file
+        c = hal.component("opcua")
     except hal.error as e:
         print(f"Error: Could not create HAL component: {e}", file=sys.stderr)
         print("Is LinuxCNC (rtapi) running?", file=sys.stderr)
         sys.exit(1)
 
-    c.newpin("machine-on", hal.HAL_BIT, hal.HAL_IN)
-    c.newpin("door-closed", hal.HAL_BIT, hal.HAL_IN)
+    # FIXED: Changed pin names to match the .hal file
+    c.newpin("machine-status", hal.HAL_BIT, hal.HAL_IN)
+    c.newpin("emergency-stop", hal.HAL_BIT, hal.HAL_IN)
     c.ready()
-    print(f"HAL Component 'hal-opcua-client' for {MACHINE_ID} is ready.")
+    # FIXED: Updated log message
+    print(f"HAL Component 'opcua' for {MACHINE_ID} is ready.")
 
     # --- 2. Connect to OPC UA Server ---
     try:
@@ -44,37 +46,32 @@ async def main():
             
             print(f"Finding nodes for {MACHINE_ID}:")
             print(f"  - {NODE_ID_MACHINE_ON}")
-            print(f"  - {NODE_ID_DOOR_CLOSED}")
+            print(f"  - {NODE_ID_EMERGENCY_STATUS}")
 
             # 2a. Get the specific nodes for this machine instance
             node_machine_on = client.get_node(NODE_ID_MACHINE_ON)
-            node_door_closed = client.get_node(NODE_ID_DOOR_CLOSED)
+            node_emergency_status = client.get_node(NODE_ID_EMERGENCY_STATUS)
             
-            # 2b. Check if nodes exist by reading their browse name (or any attribute)
+            # 2b. Check if nodes exist
             await node_machine_on.read_browse_name()
-            await node_door_closed.read_browse_name()
+            await node_emergency_status.read_browse_name()
             
             print("OPC UA Nodes found successfully.")
 
             # --- 3. Start Read/Write Loop ---
             while True:
-                # 3a. Read values from HAL
-                machine_on_val = c['machine-on']
-                door_closed_val = c['door-closed']
+                # 3a. Read values from HAL (using new pin names)
+                machine_on_val = c['machine-status']
+                emergency_stop_val = c['emergency-stop']
 
                 try:
                     # 3b. Write values to OPC UA Server
                     await node_machine_on.write_value(machine_on_val)
-                    await node_door_closed.write_value(door_closed_val)
+                    await node_emergency_status.write_value(emergency_stop_val)
                     
-                    # --- NEW LOGS ---
-                    # This print statement is now active and formatted
-                    # to show the instance, variables, and their values.
-                    print(f"[{MACHINE_ID}] OPC UA Write: Machine_On -> {machine_on_val}, Door_Closed -> {door_closed_val}")
-                    # ----------------
+                    print(f"[{MACHINE_ID}] OPC UA Write: Machine_On -> {machine_on_val}, Emergency_Stop -> {emergency_stop_val}")
 
                 except Exception as e:
-                    # Format the error log to also include the machine ID
                     print(f"[{MACHINE_ID}] OPC UA Write Error: {e}", file=sys.stderr)
 
                 # 3c. Wait for the next poll cycle

@@ -1,0 +1,20 @@
+# requirements.txt
+aiofiles
+aiosqlite
+asyncua
+cffi
+cryptography
+numpy
+opcua-client
+opcua-widgets
+pycparser
+pyopenssl
+PyQt5
+PyQt5_Qt5
+pyqt5-sip
+pyqtgraph
+python-dateutil
+pytz
+six
+sortedcontainers
+typing-extensions

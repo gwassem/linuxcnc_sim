@@ -45,7 +45,7 @@ async def main():
 
         # 5. Add variables using the explicit string NodeId
         node_id_machine_on = f"ns={idx};s={machine_id}.Machine_On"
-        node_id_door_closed = f"ns={idx};s={machine_id}.Door_Closed"
+        node_id_emergency_stop = f"ns={idx};s={machine_id}.Emergency_Stop"
         
         var_machine_on = await machine_obj.add_variable(
             node_id_machine_on, 
@@ -53,19 +53,19 @@ async def main():
             False, 
             varianttype=ua.VariantType.Boolean
         )
-        var_door_closed = await machine_obj.add_variable(
-            node_id_door_closed, 
-            "Door_Closed", 
-            True, 
+        var_emergency_stop = await machine_obj.add_variable(
+            node_id_emergency_stop, 
+            "Emergency_Stop", 
+            False, 
             varianttype=ua.VariantType.Boolean
         )
 
         # 6. Set variables to be writable
         await var_machine_on.set_writable()
-        await var_door_closed.set_writable()
+        await var_emergency_stop.set_writable()
         
         all_vars.append(var_machine_on)
-        all_vars.append(var_door_closed)
+        all_vars.append(var_emergency_stop)
     # -------------------------------------------------
 
     _logger.info(f"Server started at {OPC_UA_ENDPOINT}")

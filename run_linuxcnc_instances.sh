@@ -12,7 +12,7 @@ if ! docker images --format '{{.Repository}}' | grep -q "^${IMAGE_NAME}$"; then
 fi
 
 # --- Set number of instances to 3 ---
-INSTANCES=1
+INSTANCES=2
 # "dev" opens terminals (interactive shells inside container)
 TERMINALS="dev"
 BASE_MACHINE_NAME="Lathe" # Must match the server's BASE_MACHINE_NAME
@@ -20,7 +20,7 @@ BASE_MACHINE_NAME="Lathe" # Must match the server's BASE_MACHINE_NAME
 for i in $(seq 1 ${INSTANCES}); do
   NAME="cnc_${i}"
   MACHINE_ID="${BASE_MACHINE_NAME}_${i}" # e.g., "Lathe_1", "Lathe_2"
-  HOST_CONFIG_DIR="$HOME/linuxcnc_siml/inuxcnc-configs/${NAME}"
+  HOST_CONFIG_DIR="$HOME/linuxcnc_sim/linuxcnc-configs/${NAME}"
   RUNTIME_DIR="/tmp/runtime-linuxcnc_${i}"
 
   mkdir -p "${HOST_CONFIG_DIR}"
@@ -41,7 +41,7 @@ for i in $(seq 1 ${INSTANCES}); do
       -v \"${HOST_CONFIG_DIR}\":/home/linuxcnc/linuxcnc/configs \
       -v \"${RUNTIME_DIR}\":\"${RUNTIME_DIR}\" \
       ${IMAGE_NAME} \
-      linuxcnc /home/linuxcnc/linuxcnc/configs/lathe.ini
+      linuxcnc /home/linuxcnc/linuxcnc/configs/axis_mm.ini
       bash" &
 
   else
@@ -58,7 +58,7 @@ for i in $(seq 1 ${INSTANCES}); do
       -v "${HOST_CONFIG_DIR}":/home/linuxcnc/linuxcnc/configs \
       -v "${RUNTIME_DIR}":"${RUNTIME_DIR}" \
       ${IMAGE_NAME} \
-      linuxcnc /home/linuxcnc/linuxcnc/configs/lathe.ini
+      linuxcnc /home/linuxcnc/linuxcnc/configs/axis_mm.ini
   fi
 done
 
