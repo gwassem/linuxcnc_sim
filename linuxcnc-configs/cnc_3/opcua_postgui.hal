@@ -1,5 +1,25 @@
 # File: opcua_postgui.hal
-# Connects standard HALUI pins to the OPC-UA component
+# Connects the 'opcua' python component pins to the rest of HAL.
 
-net machine-is-on     halui.machine.is-on        => opcua.machine-status
-net estop-is-active   halui.estop.is-activated   => opcua.emergency-stop
+# Load the Python component
+loadusr -Wn opcua python3 /home/linuxcnc/linuxcnc/configs/hal_opcua_client.py
+
+# --- CNC -> SCADA Connections ---
+# Connect HAL UI status pins to the 'opcua' component's IN pins
+
+# NOTE: The 'opcua_estop_or' instance is now created
+# in 'simulated_home.hal' (or another main .hal file)
+addf opcua_estop_or servo-thread
+
+# Internal E-Stop (from the GUI)
+net int-estop-active  halui.estop.is-activated => opcua_estop_or.in0
+
+# External E-Stop (from SCADA via OPC UA)
+net ext-estop-trigger opcua.trigger-estop => opcua_estop_or.in1 halui.estop.activate
+
+# Combined signal to the 'opcua' component (for SCADA to read)
+net estop-is-active   opcua_estop_or.out       => opcua.emergency-stop
+
+# Machine On signal (unchanged)
+net machine-is-on     halui.machine.is-on      => opcua.machine-status
+

@@ -1,0 +1,62 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<OpenSCADA>
+  <station id="my_cnc_station">
+
+    <node id="sub_Transport">
+      <tbl id="Transport_in">
+        <fld ID="WEB_1" MODULE="Sockets" NAME="Generic WEB interface" ADDR="TCP::8080:0" PROT="HTTP" START="1" />
+      </tbl>
+    </node>
+
+    <node id="sub_UI">
+      <node id="mod_WebCfgD" access="-0" access-config="*" access-command="*">
+      </node>
+    <node id="mod_WebUser"><tbl id="WebUser_uPg"><fld ID="main" NAME="main" EN="1" TIMESTAMP="1763071197"><PROG>JavaLikeCalc.JavaScript
+var html = "&lt;html&gt;&lt;head&gt;&lt;title&gt;CNC Status&lt;/title&gt;";
+html += "&lt;meta http-equiv='refresh' content='5'&gt;";
+html += "&lt;style&gt;";
+html += "  body { font-family: monospace; background-color: #2B2B2B; color: #D4D4D4; padding: 20px; }";
+html += "  h1, h2 { color: #569CD6; border-bottom: 1px solid #569CD6; }";
+html += "  .status-block { background-color: #1E1E1E; border: 1px solid #333; padding: 15px; margin-bottom: 15px; border-radius: 4px; }";
+html += "  b { color: #4EC9B0; font-weight: bold; }";
+html += "&lt;/style&gt;";
+html += "&lt;/head&gt;&lt;body&gt;";
+html += "&lt;h1&gt;CNC Lathe Status (Live)&lt;/h1&gt;";
+html += "&lt;div class='status-block'&gt;";
+html += "&lt;h2&gt;Lathe 1&lt;/h2&gt;";
+html += "Machine On: &lt;b&gt;" "&lt;/b&gt;&lt;br/&gt;";
+html += "E-Stop Active: &lt;b&gt;" "&lt;/b&gt;&lt;br/&gt;";
+html += "&lt;/div&gt;";
+html += "&lt;div class='status-block'&gt;";
+html += "&lt;h2&gt;Lathe 2&lt;/h2&gt;";
+html += "Machine On: &lt;b&gt;" "&lt;/b&gt;&lt;br/&gt;";
+html += "E-Stop Active: &lt;b&gt;" "&lt;/b&gt;&lt;br/&gt;";
+html += "&lt;/div&gt;";
+html += "&lt;/body&gt;&lt;/html&gt;";
+page = html;
+rez = "200 OK";</PROG></fld></tbl></node></node>
+
+    <node id="sub_DAQ">
+      <node id="mod_OPC_UA"><prm id="cntr_opcua_client"><prm id="prm_L2_EStop_Active"><prm id="selND">Objects (85)</prm></prm><prm id="prm_L1_Machine_On"><prm id="selND">Sensors (2:2)</prm></prm><prm id="prm_L1_Exec_EStop"><prm id="selND">Commands (2:3)</prm></prm></prm>
+        <tbl id="DAQ">
+          <fld ID="opcua_client" NAME="CNC OPC-UA Client" ENABLE="1" START="1" PRM_BD="opcua_clientprm" EndPoint="opc.tcp://opcua-server:4840/linuxcnc/" SecPolicy="None" SecMessMode="1" />
+        </tbl>
+
+	<tbl id="opcua_clientprm">
+          <fld SHIFR="L1_Machine_On" NAME="Lathe 1 Machine On" EN="1" ND_LS="2:&quot;Lathe_1.Sensors.Machine_On&quot;" />
+          <fld SHIFR="L1_EStop_Active" NAME="Lathe 1 EStop Active" EN="1" ND_LS="2:&quot;Lathe_1.Sensors.EStop_Active&quot;" />
+          <fld SHIFR="L1_Exec_EStop" NAME="Lathe 1 Execute EStop" EN="1" ND_LS="2:&quot;Lathe_1.Commands.Execute_EStop&quot;" W="1" />
+
+          <fld SHIFR="L2_Machine_On" NAME="Lathe 2 Machine On" EN="1" ND_LS="2:&quot;Lathe_2.Sensors.Machine_On&quot;" />
+          <fld SHIFR="L2_EStop_Active" NAME="Lathe 2 EStop Active" EN="1" ND_LS="2:&quot;Lathe_2.Sensors.EStop_Active&quot;" />
+          <fld SHIFR="L2_Exec_EStop" NAME="Lathe 2 Execute EStop" EN="1" ND_LS="2:&quot;Lathe_2.Commands.Execute_EStop&quot;" W="1" />
+
+          <fld SHIFR="L3_Machine_On" NAME="Lathe 3 Machine On" EN="1" ND_LS="2:&quot;Lathe_3.Sensors.Machine_On&quot;" />
+          <fld SHIFR="L3_EStop_Active" NAME="Lathe 3 EStop Active" EN="1" ND_LS="2:&quot;Lathe_3.Sensors.EStop_Active&quot;" />
+          <fld SHIFR="L3_Exec_EStop" NAME="Lathe 3 Execute EStop" EN="1" ND_LS="2:&quot;Lathe_3.Commands.Execute_EStop&quot;" W="1" />
+        </tbl>
+      </node>
+    </node>
+
+  </station>
+</OpenSCADA>

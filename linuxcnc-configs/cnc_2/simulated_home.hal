@@ -1,4 +1,4 @@
-loadrt or2 names=or2_0
+loadrt or2 names=or2_0,opcua_estop_or
 loadrt comp names=comp_x,comp_y,comp_z
 
 net Xhomeswpos => comp_x.in0

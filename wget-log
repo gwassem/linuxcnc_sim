@@ -1,0 +1,11 @@
+--2025-11-13 14:25:11--  http://ftp.oscada.org/Misc/pkgSignKey
+Resolvendo ftp.oscada.org (ftp.oscada.org)... 46.98.2.159
+Conectando-se a ftp.oscada.org (ftp.oscada.org)|46.98.2.159|:80... conectado.
+A requisição HTTP foi enviada, aguardando resposta... 200 OK
+Tamanho: 1646 (1,6K)
+Salvando em: ‘STDOUT’
+
+-                     0%[                    ]       0  --.-KB/s               -                   100%[===================>]   1,61K  --.-KB/s    em 0s      
+
+2025-11-13 14:25:12 (235 MB/s) - escrito para a saída padrão  [1646/1646]
+

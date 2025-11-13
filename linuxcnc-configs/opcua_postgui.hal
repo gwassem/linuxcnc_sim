@@ -7,15 +7,16 @@ loadusr -Wn opcua python3 /home/linuxcnc/linuxcnc/configs/hal_opcua_client.py
 # --- CNC -> SCADA Connections ---
 # Connect HAL UI status pins to the 'opcua' component's IN pins
 
-# NOTE: The 'opcua_estop_or' instance is now created
-# in 'simulated_home.hal' (or another main .hal file)
+# FIX V3: Use 'or' logic with a UNIQUE NAME to avoid conflicts
+# This creates a specific instance of 'or2' named 'opcua_estop_or'
+newinst or2 opcua_estop_or
 addf opcua_estop_or servo-thread
 
 # Internal E-Stop (from the GUI)
 net int-estop-active  halui.estop.is-activated => opcua_estop_or.in0
 
 # External E-Stop (from SCADA via OPC UA)
-net ext-estop-trigger opcua.trigger-estop => opcua_estop_or.in1 halui.estop.activate
+net ext-estop-trigger opcua.trigger-estop      => opcua_estop_or.in1
 
 # Combined signal to the 'opcua' component (for SCADA to read)
 net estop-is-active   opcua_estop_or.out       => opcua.emergency-stop
@@ -23,3 +24,8 @@ net estop-is-active   opcua_estop_or.out       => opcua.emergency-stop
 # Machine On signal (unchanged)
 net machine-is-on     halui.machine.is-on      => opcua.machine-status
 
+
+# --- SCADA -> CNC Connection (NEW) ---
+# Connect the 'opcua' component's OUT pin to the HAL UI E-Stop trigger
+# This allows OpenSCADA to trigger an E-Stop.
+net scada-triggers-estop opcua.trigger-estop => halui.estop.trigger

@@ -1,86 +1,76 @@
 import asyncio
 import hal
 import sys
-import os  # Import os to read environment variables
+import os
 from asyncua import Client, ua
 
 # --- CONFIGURATION ---
+# Server address is read from the 'OPCUA_SERVER_HOST' environment variable
+# This is set to 'opcua-server' by docker-compose
+OPCUA_SERVER_HOST = os.environ.get("OPCUA_SERVER_HOST", "localhost")
+OPC_UA_URL = f"opc.tcp://{OPCUA_SERVER_HOST}:4840/linuxcnc/"
 
-# URL for the HOST OPC UA Server
-OPC_UA_URL = "opc.tcp://host.docker.internal:4840/linuxcnc/"
-
-# --- Dynamic Node Configuration ---
 MACHINE_ID = os.environ.get("MACHINE_ID", "Lathe_3")
-NAMESPACE_INDEX = 2  # This is 'idx' from the server, typically 2
-
-# NodeIDs are now generated dynamically based on the MACHINE_ID
-NODE_ID_MACHINE_ON = f"ns={NAMESPACE_INDEX};s={MACHINE_ID}.Machine_On"
-# FIXED: Changed from 'Emergency_Status' to 'Emergency_Stop' to match the server
-NODE_ID_EMERGENCY_STATUS = f"ns={NAMESPACE_INDEX};s={MACHINE_ID}.Emergency_Stop"
-# ---------------------------------
-
-# How often to read HAL and update the server (in seconds)
+NAMESPACE_INDEX = 2
 POLLING_RATE = 1.0
 
+NODE_ID_MACHINE_ON = f"ns={NAMESPACE_INDEX};s={MACHINE_ID}.Sensors.Machine_On"
+NODE_ID_ESTOP_ACTIVE = f"ns={NAMESPACE_INDEX};s={MACHINE_ID}.Sensors.EStop_Active"
+NODE_ID_EXECUTE_ESTOP = f"ns={NAMESPACE_INDEX};s={MACHINE_ID}.Commands.Execute_EStop"
+
 async def main():
-    # --- 1. Setup HAL Component ---
     try:
-        # FIXED: Changed component name to 'opcua' to match the .hal file
         c = hal.component("opcua")
     except hal.error as e:
         print(f"Error: Could not create HAL component: {e}", file=sys.stderr)
-        print("Is LinuxCNC (rtapi) running?", file=sys.stderr)
         sys.exit(1)
 
-    # FIXED: Changed pin names to match the .hal file
     c.newpin("machine-status", hal.HAL_BIT, hal.HAL_IN)
     c.newpin("emergency-stop", hal.HAL_BIT, hal.HAL_IN)
+    c.newpin("trigger-estop", hal.HAL_BIT, hal.HAL_OUT)
     c.ready()
-    # FIXED: Updated log message
     print(f"HAL Component 'opcua' for {MACHINE_ID} is ready.")
 
-    # --- 2. Connect to OPC UA Server ---
-    try:
-        print(f"Connecting to OPC UA Server at {OPC_UA_URL}...")
-        async with Client(url=OPC_UA_URL) as client:
-            
-            print(f"Finding nodes for {MACHINE_ID}:")
-            print(f"  - {NODE_ID_MACHINE_ON}")
-            print(f"  - {NODE_ID_EMERGENCY_STATUS}")
+    while True: 
+        try:
+            print(f"[{MACHINE_ID}] Connecting to OPC UA Server at {OPC_UA_URL}...")
+            async with Client(url=OPC_UA_URL) as client:
+                
+                print(f"[{MACHINE_ID}] Finding nodes...")
+                node_machine_on = client.get_node(NODE_ID_MACHINE_ON)
+                node_estop_active = client.get_node(NODE_ID_ESTOP_ACTIVE)
+                node_execute_estop = client.get_node(NODE_ID_EXECUTE_ESTOP)
+                print("OPC UA Nodes found successfully.")
 
-            # 2a. Get the specific nodes for this machine instance
-            node_machine_on = client.get_node(NODE_ID_MACHINE_ON)
-            node_emergency_status = client.get_node(NODE_ID_EMERGENCY_STATUS)
-            
-            # 2b. Check if nodes exist
-            await node_machine_on.read_browse_name()
-            await node_emergency_status.read_browse_name()
-            
-            print("OPC UA Nodes found successfully.")
+                while True:
+                    try:
+                        machine_on_val = c['machine-status']
+                        emergency_stop_val = c['emergency-stop']
+                        
+                        await node_machine_on.write_value(machine_on_val)
+                        await node_estop_active.write_value(emergency_stop_val)
+                        
+                        print(f"[{MACHINE_ID}] HAL->OPC: Machine_On={machine_on_val}, EStop={emergency_stop_val}")
+                        
+                        execute_estop_val = await node_execute_estop.read_value()
+                        
+                        if execute_estop_val:
+                            print(f"[{MACHINE_ID}] OPC UA Read: Execute_EStop detected. Triggering HAL pin.")
+                            c['trigger-estop'] = True
+                            await node_execute_estop.write_value(False)
+                        else:
+                            c['trigger-estop'] = False
 
-            # --- 3. Start Read/Write Loop ---
-            while True:
-                # 3a. Read values from HAL (using new pin names)
-                machine_on_val = c['machine-status']
-                emergency_stop_val = c['emergency-stop']
-
-                try:
-                    # 3b. Write values to OPC UA Server
-                    await node_machine_on.write_value(machine_on_val)
-                    await node_emergency_status.write_value(emergency_stop_val)
-                    
-                    print(f"[{MACHINE_ID}] OPC UA Write: Machine_On -> {machine_on_val}, Emergency_Stop -> {emergency_stop_val}")
-
-                except Exception as e:
-                    print(f"[{MACHINE_ID}] OPC UA Write Error: {e}", file=sys.stderr)
-
-                # 3c. Wait for the next poll cycle
-                await asyncio.sleep(POLLING_RATE)
-
-    except ConnectionRefusedError:
-        print(f"Error: Connection refused. Is the host server at {OPC_UA_URL} running?", file=sys.stderr)
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[{MACHINE_ID}] OPC UA Read/Write Error: {e}", file=sys.stderr)
+                        break 
+                    await asyncio.sleep(POLLING_RATE)
+        except (ConnectionRefusedError, asyncio.TimeoutError):
+            print(f"Error: Connection refused. Is {OPCUA_SERVER_HOST} running? Retrying in 5s...", file=sys.stderr)
+            await asyncio.sleep(5)
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}. Retrying in 5s...", file=sys.stderr)
+            await asyncio.sleep(5)
 
 if __name__ == "__main__":
     try:

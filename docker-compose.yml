@@ -1,0 +1,122 @@
+version: '3.8'
+
+networks:
+  cnc-net:
+    driver: bridge
+
+services:
+  # 1. The central OPC UA Server
+  opcua-server:
+    build:
+      context: .
+      dockerfile: server.Dockerfile
+    container_name: opcua-server
+    command: ["python3", "host_opcua_server.py", "3"]
+    ports:
+      - "4840:4840"
+    networks:
+      - cnc-net
+    restart: unless-stopped
+    healthcheck:
+      # This python one-liner tries to connect to port 4840. 
+      # If it succeeds (exit code 0), the container is "healthy".
+      test: ["CMD", "python3", "-c", "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.connect(('localhost', 4840)); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # 2. The OpenSCADA Supervisor
+  openscada:
+    image: dudanov/openscada:latest
+    container_name: openscada
+    ports:
+      - "8080:8080"
+    networks:
+      - cnc-net
+    volumes:
+      - $HOME/linuxcnc_sim/openscada-config:/station
+    environment:
+      - LANG=en_US.UTF-8
+      - LANGUAGE=en_US:en
+      - LC_ALL=en_US.UTF-8
+    command: ["/app/bin/openscada", "-s", "/station"]
+    depends_on:
+        opcua-server:
+            condition: service_healthy
+    restart: unless-stopped
+
+  # 3. LinuxCNC Instance 1 (with interactive command)
+  linuxcnc-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: linuxcnc-1
+    privileged: true
+    environment:
+      - DISPLAY=${DISPLAY}
+      - MACHINE_ID=Lathe_1
+      - OPCUA_SERVER_HOST=opcua-server
+      - XDG_RUNTIME_DIR=/tmp/runtime-linuxcnc_1
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - $HOME/linuxcnc_sim/linuxcnc-configs/cnc_1:/home/linuxcnc/linuxcnc/configs
+      - $HOME/linuxcnc_sim/linuxcnc-nc_files/cnc_1:/home/linuxcnc/linuxcnc/nc_files # Folder shared via Samba
+      - /tmp/runtime-linuxcnc_1:/tmp/runtime-linuxcnc_1
+    networks:
+      - cnc-net
+    depends_on:
+      - opcua-server
+    stdin_open: true  # Equivalent to -i
+    tty: true         # Equivalent to -t
+    command: ["/bin/bash", "-c", "linuxcnc /home/linuxcnc/linuxcnc/configs/axis_mm.ini; echo '--- LinuxCNC exited, press Enter for shell ---'; /bin/bash"]
+
+  # 4. LinuxCNC Instance 2 (with interactive command)
+  linuxcnc-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: linuxcnc-2
+    privileged: true
+    environment:
+      - DISPLAY=${DISPLAY}
+      - MACHINE_ID=Lathe_2
+      - OPCUA_SERVER_HOST=opcua-server
+      - XDG_RUNTIME_DIR=/tmp/runtime-linuxcnc_2
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - $HOME/linuxcnc_sim/linuxcnc-configs/cnc_2:/home/linuxcnc/linuxcnc/configs
+      - $HOME/linuxcnc_sim/linuxcnc-nc_files/cnc_2:/home/linuxcnc/linuxcnc/nc_files # Folder shared via Samba
+      - /tmp/runtime-linuxcnc_2:/tmp/runtime-linuxcnc_2
+    networks:
+      - cnc-net
+    depends_on:
+      - opcua-server
+    stdin_open: true  # Equivalent to -i
+    tty: true         # Equivalent to -t
+    command: ["/bin/bash", "-c", "linuxcnc /home/linuxcnc/linuxcnc/configs/axis_mm.ini; echo '--- LinuxCNC exited, press Enter for shell ---'; /bin/bash"]
+
+  # 5. LinuxCNC Instance 3
+  linuxcnc-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: linuxcnc-3
+    privileged: true
+    environment:
+      - DISPLAY=${DISPLAY}
+      - MACHINE_ID=Lathe_3
+      - OPCUA_SERVER_HOST=opcua-server
+      - XDG_RUNTIME_DIR=/tmp/runtime-linuxcnc_3
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - $HOME/linuxcnc_sim/linuxcnc-configs/cnc_3:/home/linuxcnc/linuxcnc/configs
+      - $HOME/linuxcnc_sim/linuxcnc-nc_files/cnc_3:/home/linuxcnc/linuxcnc/nc_files 
+      - /tmp/runtime-linuxcnc_3:/tmp/runtime-linuxcnc_3
+    networks:
+      - cnc-net
+    depends_on:
+      - opcua-server
+    stdin_open: true  
+    tty: true         
+    command: ["/bin/bash", "-c", "linuxcnc /home/linuxcnc/linuxcnc/configs/axis_mm.ini; echo '--- LinuxCNC exited, press Enter for shell ---'; /bin/bash"]
