@@ -37,7 +37,7 @@ page = html;
 rez = "200 OK";</PROG></fld></tbl></node></node>
 
     <node id="sub_DAQ">
-      <node id="mod_OPC_UA"><prm id="cntr_opcua_client"><prm id="prm_L2_EStop_Active"><prm id="selND">Objects (85)</prm></prm><prm id="prm_L1_Machine_On"><prm id="selND">Sensors (2:2)</prm></prm><prm id="prm_L1_Exec_EStop"><prm id="selND">Commands (2:3)</prm></prm></prm>
+      <node id="mod_OPC_UA"><prm id="cntr_opcua_client"><prm id="prm_L1_EStop_Active"><prm id="selND">Sensors (2:2)</prm></prm><prm id="prm_L2_EStop_Active"><prm id="selND">Objects (85)</prm></prm><prm id="prm_L1_Machine_On"><prm id="selND">Sensors (2:2)</prm></prm><prm id="prm_L1_Exec_EStop"><prm id="selND">Commands (2:3)</prm></prm></prm>
         <tbl id="DAQ">
           <fld ID="opcua_client" NAME="CNC OPC-UA Client" ENABLE="1" START="1" PRM_BD="opcua_clientprm" EndPoint="opc.tcp://opcua-server:4840/linuxcnc/" SecPolicy="None" SecMessMode="1" />
         </tbl>
