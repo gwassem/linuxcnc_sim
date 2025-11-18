@@ -1,123 +1,151 @@
 # LinuxCNC Multi-Instance Fleet Simulation
 
-## Overview
+## 1\. Overview
 
-This project simulates a **fleet of multiple LinuxCNC machines** (e.g., lathes) running in parallel. Each simulation runs inside its own Docker container.
+This project provides a complete, containerized environment for simulating a **fleet of multiple LinuxCNC machines** (three, by default). It is designed for testing and validating distributed monitoring and control systems.
 
-A central **OPC UA server**, running on the host machine, monitors the status of every machine in the fleet. Each containerized simulation sends its status (like "Machine On" and "E-Stop") to this central server, allowing for single-point monitoring of the entire machine cell.
+The architecture is built around a central **OPC UA server** that acts as the single source of truth for the entire machine cell. Each simulated LinuxCNC machine runs independently in its own container, connects to this central server, and reports its real-time status (e.g., *Machine On*, *E-Stop Active*).
 
-## Architecture
+Finally, an **OpenSCADA** service provides a web-based dashboard, offering a top-down view of the entire fleet by consuming data from the OPC UA server.
 
-The system is composed of two main parts: the **Host Server** and the **Simulation Containers**.
+## 2\. Repository Structure
 
-1.  **Host Server (`host_opcua_server.py`):**
-    * A Python server you run on your local machine.
-    * It uses `asyncua` to create a central OPC UA endpoint.
-    * It dynamically creates objects in its namespace for each machine (e.g., `Lathe_1`, `Lathe_2`).
-
-2.  **Simulation Containers (`Dockerfile`):**
-    * Each container runs a full, independent LinuxCNC 2.9 simulation.
-    * Inside each container, a Python client (`hal_opcua_client.py`) connects the simulation's internal signals (HAL pins) to the host's OPC UA server.
-    * A launcher script (`run_linuxcnc_instances.sh`) starts all containers.
-
-
-### Data Flow
-The data flows from the simulation's UI to the central server:
-1.  A user clicks "Machine On" in a LinuxCNC GUI.
-2.  The `halui.machine.is-on` pin goes `True`.
-3.  `opcua_postgui.hal` connects this pin to the `opcua.machine-status` pin.
-4.  The `hal_opcua_client.py` script reads this pin.
-5.  The client sends the `True` value to the host server (e.g., to the `Lathe_1.Machine_On` OPC UA node).
-
-## Key Components
-
-* `host_opcua_server.py`: The central OPC UA data aggregation server.
-* `run_linuxcnc_instances.sh`: Shell script to build and launch the LinuxCNC simulation containers.
-* `Dockerfile`: Builds the container image with LinuxCNC 2.9 and all dependencies.
-* `linuxcnc-configs/`: Contains all the simulation configuration files (INI, HAL).
-* `hal_opcua_client.py`: (Runs *inside* container) The client that reads HAL pins and sends data to the host server.
-* `opcua_postgui.hal`: (Runs *inside* container) Connects LinuxCNC's UI pins to the OPC UA client's pins.
-
-## How to Run the Simulation
-
-### Prerequisites
-* Docker
-* Python 3
-* `asyncua` Python library
-* An X11 server (standard on desktop Linux)
-
-### Step 1: Install Host Dependencies
-The host server requires the `asyncua` library.
-```bash
-# Installs asyncua and other dependencies
-pip3 install -r requirements.txt
-````
-
-### Step 2: Build the Docker Image
-
-The launcher script will do this for you, but you can run it manually:
-
-```bash
-docker build -t linuxcnc-image .
+```
+linuxcnc_sim-main/
+│
+├── docker-compose.yml        # Master file: defines and launches all services.
+├── Dockerfile                # Builds the LinuxCNC simulation container.
+├── server.Dockerfile         # Builds the lightweight OPC UA server container.
+│
+├── host_opcua_server.py      # Python code for the central OPC UA server.
+├── entrypoint.sh             # Helper script to start LinuxCNC inside its container.
+├── requirements.txt          # Python requirements.
+│
+├── linuxcnc-configs/         # Directory for machine-specific configs.
+│   ├── cnc_1/
+│   │   ├── axis_mm.ini       # LinuxCNC config (axes, kinematics).
+│   │   ├── opcua_postgui.hal # HAL file to load the OPC UA client.
+│   │   └── hal_opcua_client.py # Python script (the OPC UA client).
+│   ├── cnc_2/                # (Identical structure for machine 2)
+│   └── cnc_3/                # (Identical structure for machine 3)
+│
+├── linuxcnc-nc_files/        # G-code files folder, connected by Samba.
+│
+├── openscada-config/
+│   └── oscada.xml            # OpenSCADA configuration for the web dashboard.
+│
+└── Pictures/                 # Project images
 ```
 
-### Step 3: Run the Host OPC UA Server
+## 3\. Architecture
 
-You must start the central server first. The `run_linuxcnc_instances.sh` script is configured to launch **2** instances, so you **must** pass `2` as an argument.
+The entire system is orchestrated by `docker-compose.yml` and runs on a dedicated bridge network (`cnc-net`) to allow services to communicate using their container names as hostnames.
 
-Open a terminal and run:
+The system consists of five key services:
 
-```bash
-python3 host_opcua_server.py 2
-```
+1.  **`opcua-server` (The Hub):**
 
-You should see it start and register nodes for `Lathe_1` and `Lathe_2`.
+      * Built from `server.Dockerfile`, this is a minimal Python container running the `host_opcua_server.py` script.
+      * It acts as the central data broker. Upon launch, it receives a command-line argument (`3`) instructing it to create an OPC UA namespace for three machines: `Lathe_1`, `Lathe_2`, and `Lathe_3`.
 
-### Step 4: Run the LinuxCNC Instances
+2.  **`linuxcnc-1`, `linuxcnc-2`, `linuxcnc-3` (The Machines):**
 
-Open a **second terminal** and run the launcher script:
+      * These three identical containers are the core simulations, built from the main `Dockerfile`.
+      * This `Dockerfile` compiles LinuxCNC 2.9 from source and sets up a complete simulation environment.
+      * Each container runs a full LinuxCNC instance with its `AXIS` GUI, which is displayed on the host's X11 server.
+      * Crucially, each container also runs the `hal_opcua_client.py` script. This script connects to the `opcua-server` container and acts as a two-way "data bridge."
 
-```bash
-bash run_linuxcnc_instances.sh
-```
+3.  **`openscada` (The Dashboard):**
 
-This will open two new terminal windows, each launching a separate LinuxCNC instance. You will see two LinuxCNC (AXIS) GUIs appear.
+      * This service runs a standard `dudanov/openscada` image.
+      * Its configuration is loaded from `oscada.xml`, which instructs it to connect to `opc.tcp://opcua-server:4840/linuxcnc/` as a client.
+      * It reads the status variables from all lathes and presents them on a simple web dashboard, accessible from the host.
 
-## How to Verify
+### End-to-End Data Flow (Example)
 
-1.  **Check Server Logs:** The terminal from Step 3 should show messages like `[Lathe_1] OPC UA Write: ...` as it receives data.
-2.  **Use an OPC UA Client:**
-      * Use a client like **UaExpert** to connect to the host server.
-      * **Endpoint:** `opc.tcp://localhost:4840/linuxcnc/`
-      * You will see `Lathe_1` and `Lathe_2` in the address space.
-3.  **Toggle Machine State:**
-      * In the **cnc\_1** GUI, click the "Machine On" (F2) button.
-      * In UaExpert, watch the `Lathe_1.Machine_On` variable flip to `True`.
-      * In the **cnc\_2** GUI, click the "E-Stop" (F1) button.
-      * In UaExpert, watch the `Lathe_2.Emergency_Stop` variable flip to `True`.
+1.  A user clicks the "Machine On" button in the **`linuxcnc-1`** GUI.
+2.  A HAL signal (`halui.machine.is-on`) inside that container goes `True`.
+3.  The `opcua_postgui.hal` file routes this signal to the `hal_opcua_client.py` script.
+4.  The Python script, knowing its `MACHINE_ID` is `Lathe_1`, writes `True` to the `Lathe_1.Sensors.Machine_On` node on the central `opcua-server`.
+5.  The `openscada` service, which is subscribed to this node, reads the change and updates the web dashboard at `http://localhost:8080`.
 
-<!-- end list -->
+## 4\. Component Breakdown
 
+### Key Files & Their Purpose
 
----
+  * **`docker-compose.yml`**
 
+      * **Purpose:** The master orchestration file. It defines all services, builds their respective images, connects them to the `cnc-net` network, and maps host volumes (like configuration files and X11 sockets). It is the single entry point for launching the entire simulation.
 
+  * **`Dockerfile`**
 
-## Initial Validation Plan
+      * **Purpose:** A "heavyweight" build script that installs all dependencies for, and compiles **LinuxCNC 2.9 from source** inside an `ubuntu:22.04` image. It also creates the `linuxcnc` user and sets up the environment required to run the simulation GUI.
 
-A formal validation test should consist of the following steps:
-1.  **Launch:** Start the `host_opcua_server.py 2` and `run_linuxcnc_instances.sh` scripts.
-2.  **Verify Connections:** Confirm two `AXIS` GUIs are visible and the host server log shows write messages from both `Lathe_1` and `Lathe_2`.
-3.  **Connect Client:** Connect UaExpert (or other OPC UA client) to `opc.tcp://localhost:4840/linuxcnc/`.
-4.  **Verify Namespace:** Confirm `Lathe_1` and `Lathe_2` objects exist with their `Machine_On` and `Emergency_Stop` children, all defaulting to `False`.
-5.  **Test Instance 1:**
-    * On the `cnc_1` GUI, press F2 to turn the machine on.
-    * **Expected Result:** The `Lathe_1.Machine_On` node in UaExpert flips to `True`.
-6.  **Test Instance 2:**
-    * On the `cnc_2` GUI, press F1 to activate the E-Stop.
-    * **Expected Result:** The `Lathe_2.Emergency_Stop` node in UaExpert flips to `True`.
+  * **`server.Dockerfile`**
 
-This completes my initial documentation. I am ready to document further changes or create the "Researcher's Manual" based on this analysis.
-````
+      * **Purpose:** A minimal, lightweight build script. It uses a `python:3.10-slim` image and installs *only* the `asyncua` library. This creates a fast-to-launch, low-resource container for the sole purpose of running the central server.
 
+  * **`host_opcua_server.py`**
 
+      * **Purpose:** The code for the central OPC UA server. It's an `asyncua` server that, when run, takes a number as an argument (e.g., `3`). It then dynamically builds a namespace containing an object for each machine (e.g., `Lathe_1`, `Lathe_2`, `Lathe_3`), each with its own `Sensors` and `Commands` variables.
+
+  * **`hal_opcua_client.py`**
+
+      * **Purpose:** This is the "data bridge" that runs *inside* each LinuxCNC container. It is a Python script that creates a HAL component (`opcua`) and also connects as a client to the central `opcua-server`. It continuously reads its HAL input pins (like `machine-status`) and writes those values to the OPC UA server, and vice-versa for commands.
+
+  * **`opcua_postgui.hal`**
+
+      * **Purpose:** A HAL configuration file loaded by LinuxCNC after the GUI starts. Its one and only job is to load the `hal_opcua_client.py` script as a real-time component (`loadusr`) and connect its HAL pins (e.g., `opcua.machine-status`) to the main LinuxCNC HAL signals (e.g., `halui.machine.is-on`).
+
+  * **`axis_mm.ini`**
+
+      * **Purpose:** The standard LinuxCNC configuration file. It defines the machine's properties (kinematics, axes limits, velocities) and, most importantly, specifies which HAL files to load (like `opcua_postgui.hal`).
+
+  * **`oscada.xml`**
+
+      * **Purpose:** The configuration file for the OpenSCADA service. It defines the data source (our `opcua-server`) and maps specific OPC UA nodes (e.t., `2:"Lathe_1.Sensors.Machine_On"`) to internal SCADA tags, which are then displayed on its web interface.
+
+  * **`entrypoint.sh`**
+
+      * **Purpose:** A utility script used by the `Dockerfile` to start the LinuxCNC container. It correctly sets up the `XDG_RUNTIME_DIR` and provides a flexible way to launch the `linuxcnc` command with the correct configuration file.
+
+## 5\. Quick Start
+
+This project is managed entirely by Docker Compose.
+
+**Prerequisites:**
+
+  * Docker
+  * Docker Compose
+  * An X11 server (for viewing the LinuxCNC GUIs)
+
+**Launch:**
+
+1.  **Clone the repository** (or ensure you are in the project's root directory).
+2.  **Set up external volumes:** The `docker-compose.yml` file maps local directories (e.g., `$HOME/linuxcnc_sim/linuxcnc-configs`) into the containers. Ensure these directories exist on your host machine.
+3.  **Launch the simulation stack:**
+    ```bash
+    docker-compose up --build
+    ```
+4.  **Observe:** You should see:
+      * Three LinuxCNC `AXIS` GUIs appear on your desktop.
+      * The `opcua-server` log showing it has configured 3 instances.
+      * The OpenSCADA service start.
+
+## 6\. Validation Plan
+
+1.  **Launch:** Start the stack using `docker-compose up`.
+2.  **Verify Connections:** Confirm three `AXIS` GUIs are visible and the `opcua-server` log is running.
+3.  **Connect OPC UA Client:**
+      * Use a client like UaExpert to connect to the server at: `opc.tcp://localhost:4840/linuxcnc/`
+      * Verify you see `Lathe_1`, `Lathe_2`, and `Lathe_3` in the namespace, each with `Sensors` and `Commands` folders.
+4.  **Connect SCADA Client:**
+      * Open a web browser to `http://localhost:8080`.
+      * You should see the OpenSCADA dashboard, showing the status of all three lathes (defaulting to 'False' or 'Off').
+5.  **Test Instance 1 (CNC -\> SCADA):**
+      * In the **`linuxcnc-1`** GUI, click the "Machine On" (F2) button.
+      * **Expected Result:** Watch the `Lathe_1.Sensors.Machine_On` variable flip to `True` in UaExpert.
+      * **Expected Result:** Watch the "Lathe 1 Machine On" status update to `True` on the OpenSCADA web dashboard.
+6.  **Test Instance 2 (SCADA -\> CNC):**
+      * In UaExpert, find the `Lathe_2.Commands.Execute_EStop` node, set it to `True`.
+      * **Expected Result:** The **`linuxcnc-2`** GUI should immediately enter an E-Stop state. The `Lathe_2.Sensors.EStop_Active` node should flip to `True` in UaExpert and OpenSCADA.
